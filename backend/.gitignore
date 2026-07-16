@@ -1,0 +1,32 @@
+
+.env.example
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Django local database and uploads
+db.sqlite3
+db.sqlite3-journal
+media/
+
+# Configuration and secrets
+.env
+local_settings.py
+
+# Python virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Logs and test caches
+*.log
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDEs and OS files
+.vscode/
+.idea/
+.DS_Store
