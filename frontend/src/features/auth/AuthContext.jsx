@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { invalidateAuthRequests, setUnauthorizedHandler } from '../../services/api/client.js'
-import { getMyProfile, login as loginRequest, logout as logoutRequest } from '../../services/auth/authApi.js'
+import { login as loginRequest, logout as logoutRequest } from '../../services/auth/authApi.js'
 import { clearPendingOtp, clearResetToken } from '../../services/auth/authSession.js'
 import { clearStoredTokens, getStoredTokens, storeTokens } from '../../services/auth/tokenStorage.js'
+import { getMyProfile } from '../../services/profiles/profileApi.js'
 import { AuthContext } from './authContextObject.js'
 
 function isComplete(entity) {
@@ -22,13 +23,33 @@ function userFromProfile(profile) {
   }
 }
 
+const developmentDemoProfile = {
+  demo_professional_preview: true,
+  display_name: 'Polinq Demo',
+  discovery_radius_km: 25,
+  location_label: 'Demo workspace',
+  onboarding_complete: true,
+  onboarding_status: 'COMPLETED',
+  profile_photo_url: '',
+  user_id: 'development-demo-user',
+  username: 'demo',
+}
+
+function isDevelopmentDemoSession() {
+  return import.meta.env.DEV && new URLSearchParams(window.location.search).get('demo') === 'true'
+}
+
 export function AuthProvider({ children }) {
-  const [status, setStatus] = useState('loading')
-  const [user, setUser] = useState(null)
-  const [profile, setProfile] = useState(null)
+  const demoSession = isDevelopmentDemoSession()
+  const [status, setStatus] = useState(demoSession ? 'authenticated' : 'loading')
+  const [user, setUser] = useState(demoSession ? userFromProfile(developmentDemoProfile) : null)
+  const [profile, setProfile] = useState(demoSession ? developmentDemoProfile : null)
   const bootstrapped = useRef(false)
 
   const clearSession = useCallback(() => {
+    if (demoSession) {
+      return
+    }
     invalidateAuthRequests()
     clearStoredTokens()
     clearPendingOtp()
@@ -36,16 +57,22 @@ export function AuthProvider({ children }) {
     setUser(null)
     setProfile(null)
     setStatus('unauthenticated')
-  }, [])
+  }, [demoSession])
 
   const refreshProfile = useCallback(async () => {
+    if (demoSession) {
+      return developmentDemoProfile
+    }
     const nextProfile = await getMyProfile()
     setProfile(nextProfile)
     return nextProfile
-  }, [])
+  }, [demoSession])
 
   const establishSession = useCallback(
     async (tokenData, { fetchProfile = true } = {}) => {
+      if (demoSession) {
+        return
+      }
       storeTokens(tokenData)
       let nextProfile = null
       if (fetchProfile) {
@@ -59,19 +86,25 @@ export function AuthProvider({ children }) {
       setUser(tokenData.user || userFromProfile(nextProfile))
       setStatus('authenticated')
     },
-    [clearSession, refreshProfile],
+    [clearSession, demoSession, refreshProfile],
   )
 
   const signIn = useCallback(
     async (payload) => {
+      if (demoSession) {
+        return { profile: developmentDemoProfile, user: userFromProfile(developmentDemoProfile) }
+      }
       const tokenData = await loginRequest(payload)
       await establishSession(tokenData)
       return tokenData
     },
-    [establishSession],
+    [demoSession, establishSession],
   )
 
   const signOut = useCallback(async () => {
+    if (demoSession) {
+      return
+    }
     const { access, refresh } = getStoredTokens()
     clearSession()
     try {
@@ -81,7 +114,7 @@ export function AuthProvider({ children }) {
     } catch {
       // Local logout must complete even when the network or access token fails.
     }
-  }, [clearSession])
+  }, [clearSession, demoSession])
 
   useEffect(() => {
     setUnauthorizedHandler(clearSession)
@@ -92,6 +125,9 @@ export function AuthProvider({ children }) {
       return
     }
     bootstrapped.current = true
+    if (demoSession) {
+      return
+    }
 
     async function restore() {
       const { refresh } = getStoredTokens()
@@ -111,7 +147,7 @@ export function AuthProvider({ children }) {
     }
 
     restore()
-  }, [clearSession, refreshProfile])
+  }, [clearSession, demoSession, refreshProfile])
 
   const onboardingComplete = isComplete(profile) || isComplete(user)
 
@@ -119,6 +155,7 @@ export function AuthProvider({ children }) {
     () => ({
       clearSession,
       establishSession,
+      isDemoSession: demoSession,
       isAuthenticated: status === 'authenticated',
       loading: status === 'loading',
       onboardingComplete,
@@ -132,6 +169,7 @@ export function AuthProvider({ children }) {
     [
       clearSession,
       establishSession,
+      demoSession,
       onboardingComplete,
       profile,
       refreshProfile,

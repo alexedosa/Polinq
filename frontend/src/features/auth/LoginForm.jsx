@@ -33,7 +33,7 @@ export function LoginForm() {
         identifier: form.identifier.trim(),
         password: form.password,
       })
-      navigateTo(tokenData.user?.onboarding_complete ? '/pulse' : '/onboarding/username')
+      navigateTo(tokenData.user?.onboarding_complete ? '/pulse' : '/product-onboarding')
     } catch (nextError) {
       setError(nextError)
     } finally {

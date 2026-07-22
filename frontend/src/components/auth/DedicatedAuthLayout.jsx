@@ -1,9 +1,23 @@
+import { useEffect, useState } from 'react'
 import { Logo } from '../branding/Logo.jsx'
 import { AuthCityGrid } from './AuthCityGrid.jsx'
+import {
+  clearAuthenticationTransitionCover,
+  hasAuthenticationTransitionCover,
+} from '../../services/onboarding/productOnboarding.js'
 
 export function DedicatedAuthLayout({ children }) {
+  const [showTransitionCover] = useState(hasAuthenticationTransitionCover)
+
+  useEffect(() => {
+    if (showTransitionCover) {
+      clearAuthenticationTransitionCover()
+    }
+  }, [showTransitionCover])
+
   return (
     <div className="dedicated-auth-shell">
+      {showTransitionCover ? <span className="auth-transition-cover" aria-hidden="true" /> : null}
       <header className="dedicated-auth-brand-header">
         <Logo />
       </header>

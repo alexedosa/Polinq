@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "iconsax-reactjs": "^0.0.8",
+    "libphonenumber-js": "^1.13.9",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },

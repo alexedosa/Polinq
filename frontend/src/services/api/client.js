@@ -60,12 +60,12 @@ async function refreshTokens() {
       method: 'POST',
     })
       .catch(() => {
-        throw new ApiError({
-          code: 'NETWORK_ERROR',
-          errors: {},
-          message: 'Unable to refresh your session. Please sign in again.',
-          status: 0,
-        })
+      throw new ApiError({
+        code: 'NETWORK_ERROR',
+        errors: {},
+        message: "We couldn't connect to Polinq. Check your connection and try again.",
+        status: 0,
+      })
       })
       .then(parseResponse)
       .then((payload) => {
@@ -123,7 +123,7 @@ export async function apiRequest(path, options = {}) {
       throw new ApiError({
         code: 'NETWORK_ERROR',
         errors: {},
-        message: 'Unable to reach Polinq. Check your connection and try again.',
+        message: "We couldn't connect to Polinq. Check your connection and try again.",
         status: 0,
       })
     } finally {

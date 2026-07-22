@@ -16,6 +16,7 @@ import {
   getPendingOtp,
   setResetToken,
 } from '../../services/auth/authSession.js'
+import { clearRegistrationDraft } from '../../services/auth/registrationDraft.js'
 import { navigateTo } from '../../lib/navigation.js'
 import { useAuth } from './useAuth.js'
 import { AuthForm } from './AuthForm.jsx'
@@ -28,6 +29,7 @@ export function VerifyOtpForm() {
   const [isResending, setIsResending] = useState(false)
   const [cooldown, setCooldown] = useState(60)
   const pendingOtp = getPendingOtp()
+  const backPath = pendingOtp.purpose === REGISTER_PURPOSE ? '/register' : '/forgot-password'
 
   useEffect(() => {
     if (cooldown <= 0) {
@@ -67,8 +69,9 @@ export function VerifyOtpForm() {
         purpose: pendingOtp.purpose || REGISTER_PURPOSE,
       })
       clearPendingOtp()
+      clearRegistrationDraft()
       await establishSession(result)
-      navigateTo(result.user?.onboarding_complete ? '/pulse' : '/onboarding/username')
+      navigateTo(result.user?.onboarding_complete ? '/pulse' : '/product-onboarding')
     } catch (nextError) {
       setError(nextError)
     } finally {
@@ -109,9 +112,9 @@ export function VerifyOtpForm() {
   return (
     <AuthForm onSubmit={handleSubmit}>
       <AuthHeader
-        eyebrow="VERIFY YOUR EMAIL"
+        eyebrow="VERIFY YOUR ACCOUNT"
         title="Enter your code."
-        description="We sent a six-digit verification code to your email."
+        description="We sent a six-digit verification code to your email or phone number."
       />
       {error ? <p className="form-status form-status--error" role="alert">{formErrorMessage(error)}</p> : null}
       <div className="field-stack">
@@ -146,7 +149,7 @@ export function VerifyOtpForm() {
         </button>
       </div>
       <PrimaryButton disabled={code.length !== 6} isLoading={isLoading} type="submit">Continue</PrimaryButton>
-      <SecondaryButton as={AppLink} to="/login">
+      <SecondaryButton as={AppLink} to={backPath}>
         Back
       </SecondaryButton>
     </AuthForm>

@@ -39,7 +39,7 @@ export function PasswordInput({
         </button>
       </span>
       {error ? (
-        <span className="field-error" id={errorId}>
+        <span className="field-error" id={errorId} role="alert">
           {error}
         </span>
       ) : null}

@@ -33,7 +33,7 @@ export function AuthInput({
         value={value}
       />
       {error ? (
-        <span className="field-error" id={errorId}>
+        <span className="field-error" id={errorId} role="alert">
           {error}
         </span>
       ) : null}

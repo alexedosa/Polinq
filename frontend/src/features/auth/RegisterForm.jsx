@@ -1,18 +1,23 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AuthFooter } from '../../components/auth/AuthFooter.jsx'
 import { AuthHeader } from '../../components/auth/AuthHeader.jsx'
 import { AuthInput } from '../../components/auth/AuthInput.jsx'
 import { PasswordInput } from '../../components/auth/PasswordInput.jsx'
+import { PhoneNumberInput } from '../../components/auth/PhoneNumberInput.jsx'
 import { PrimaryButton } from '../../components/ui/Button.jsx'
-import { fieldMessage, formErrorMessage } from '../../services/api/errors.js'
+import { ApiError, fieldMessage, formErrorMessage } from '../../services/api/errors.js'
 import { REGISTER_PURPOSE, register } from '../../services/auth/authApi.js'
 import { setPendingOtp } from '../../services/auth/authSession.js'
+import { getRegistrationDraft, setRegistrationDraft } from '../../services/auth/registrationDraft.js'
+import { DEFAULT_PHONE_COUNTRY } from '../../services/phone/phoneCountries.js'
+import { normalizeLocalPhoneNumber } from '../../services/phone/phoneNumber.js'
 import { navigateTo } from '../../lib/navigation.js'
 import { AuthForm } from './AuthForm.jsx'
 import { SocialAuthGroup } from './SocialAuthGroup.jsx'
 
 export function RegisterForm() {
-  const [form, setForm] = useState({
+  const registrationDraft = getRegistrationDraft()
+  const [form, setForm] = useState(() => registrationDraft?.form || {
     confirm_password: '',
     email: '',
     full_name: '',
@@ -20,10 +25,46 @@ export function RegisterForm() {
   })
   const [error, setError] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [localPhoneNumber, setLocalPhoneNumber] = useState(() => registrationDraft?.localPhoneNumber || '')
+  const [selectedCountry, setSelectedCountry] = useState(() => (
+    registrationDraft?.selectedCountry || DEFAULT_PHONE_COUNTRY
+  ))
+
+  useEffect(() => {
+    setRegistrationDraft({ form, localPhoneNumber, selectedCountry })
+  }, [form, localPhoneNumber, selectedCountry])
 
   const updateField = (field) => (event) => {
-    setError(null)
+    clearFieldError(field)
     setForm((current) => ({ ...current, [field]: event.target.value }))
+  }
+
+  function clearFieldError(field) {
+    setError((current) => {
+      if (!(current instanceof ApiError) || !current.errors?.[field]) {
+        return current
+      }
+
+      const { [field]: removed, ...nextErrors } = current.errors
+      void removed
+
+      return new ApiError({
+        code: current.code,
+        errors: nextErrors,
+        message: current.message,
+        status: current.status,
+      })
+    })
+  }
+
+  function updatePhoneNumber(value) {
+    clearFieldError('phone_number')
+    setLocalPhoneNumber(value)
+  }
+
+  function updateCountry(country) {
+    clearFieldError('phone_number')
+    setSelectedCountry(country)
   }
 
   async function handleSubmit() {
@@ -34,17 +75,37 @@ export function RegisterForm() {
     setIsLoading(true)
     try {
       const email = form.email.trim()
-      await register({
+      const phoneNumber = localPhoneNumber.trim()
+      const normalizedPhoneNumber = phoneNumber
+        ? normalizeLocalPhoneNumber(phoneNumber, selectedCountry)
+        : ''
+      const payload = {
         confirm_password: form.confirm_password,
-        email,
         full_name: form.full_name.trim(),
         password: form.password,
-        phone_number: null,
-      })
-      setPendingOtp({ identifier: email, purpose: REGISTER_PURPOSE })
+      }
+
+      if (email) {
+        payload.email = email
+      }
+      if (normalizedPhoneNumber) {
+        payload.phone_number = normalizedPhoneNumber
+      }
+
+      await register(payload)
+      setPendingOtp({ identifier: normalizedPhoneNumber || email, purpose: REGISTER_PURPOSE })
       navigateTo('/verify-otp')
     } catch (nextError) {
-      setError(nextError)
+      if (nextError instanceof ApiError) {
+        setError(nextError)
+      } else {
+        setError(new ApiError({
+          code: 'VALIDATION_ERROR',
+          errors: { phone_number: [nextError.message] },
+          message: 'Please correct the highlighted fields.',
+          status: 0,
+        }))
+      }
     } finally {
       setIsLoading(false)
     }
@@ -80,6 +141,14 @@ export function RegisterForm() {
           type="email"
           value={form.email}
         />
+        <PhoneNumberInput
+          disabled={isLoading}
+          error={fieldMessage(error?.errors, 'phone_number')}
+          localPhoneNumber={localPhoneNumber}
+          onCountryChange={updateCountry}
+          onPhoneChange={updatePhoneNumber}
+          selectedCountry={selectedCountry}
+        />
         <PasswordInput
           autoComplete="new-password"
           disabled={isLoading}
@@ -101,7 +170,7 @@ export function RegisterForm() {
         />
       </div>
       <PrimaryButton
-        disabled={!form.full_name.trim() || !form.email.trim() || !form.password || !form.confirm_password}
+        disabled={!form.full_name.trim() || (!form.email.trim() && !localPhoneNumber.trim()) || !form.password || !form.confirm_password}
         isLoading={isLoading}
         type="submit"
       >
